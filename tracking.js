@@ -1,7 +1,19 @@
 (function () {
   const TRACK_DB = "DealDhamakaTracking";
-  const TRACK_VER = 1;
+  const TRACK_VER = 2;
   let trackDB = null;
+  let batchQueue = [];
+  let batchIndex = 0;
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+
+  function uid() {
+    return crypto.randomUUID ? crypto.randomUUID() :
+      Date.now() + "-" + Math.random();
+  }
 
   function openTrackingDB() {
     return new Promise((resolve, reject) => {
@@ -32,242 +44,237 @@
     return new Promise((resolve, reject) => {
       const tx = trackDB.transaction(store, "readonly");
       const req = tx.objectStore(store).getAll();
-
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
   }
 
-  function saveTracking(store, data) {
+  function putTracking(store, obj) {
     return new Promise((resolve, reject) => {
       const tx = trackDB.transaction(store, "readwrite");
-      tx.objectStore(store).put(data);
-
-      tx.oncomplete = () => resolve();
+      tx.objectStore(store).put(obj);
+      tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
     });
   }
 
-  function uid() {
-    return crypto.randomUUID
-      ? crypto.randomUUID()
-      : Date.now() + "-" + Math.random();
-  }
-
-  function esc(s) {
-    return String(s ?? "").replace(/[&<>"']/g, c => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    }[c]));
-  }
-
-  function getAppData(store) {
+  async function getMain(store) {
     return new Promise((resolve, reject) => {
-      const r = indexedDB.open("DealDhamakaAgent", 1);
+      const req = indexedDB.open("DealDhamakaAgent", 1);
 
-      r.onsuccess = () => {
-        const db = r.result;
-
-        if (!db.objectStoreNames.contains(store)) {
-          resolve([]);
-          return;
-        }
-
+      req.onsuccess = () => {
+        const db = req.result;
         const tx = db.transaction(store, "readonly");
-        const req = tx.objectStore(store).getAll();
+        const r = tx.objectStore(store).getAll();
 
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
+        r.onsuccess = () => {
+          resolve(r.result);
+          db.close();
+        };
+
+        r.onerror = () => reject(r.error);
       };
 
-      r.onerror = () => reject(r.error);
+      req.onerror = () => reject(req.error);
     });
   }
 
-  function addStyles() {
-    if (document.getElementById("trackingStyles")) return;
+  function injectStyles() {
+    if ($("trackingEnhancedStyles")) return;
 
     const style = document.createElement("style");
-    style.id = "trackingStyles";
+    style.id = "trackingEnhancedStyles";
 
     style.textContent = `
-      #tracking .trackstats {
-        display:grid;
-        grid-template-columns:repeat(2,1fr);
+      .multiBox{
+        background:#fff;
+        border-radius:18px;
+        padding:16px;
+        margin-top:12px;
+        box-shadow:0 3px 15px #00000010;
+      }
+
+      .multiHead{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
         gap:10px;
-        margin-bottom:14px;
-      }
-
-      #tracking .trackstat {
-        background:#fff;
-        border-radius:16px;
-        padding:16px;
-        box-shadow:0 2px 8px #00000012;
-      }
-
-      #tracking .trackstat b {
-        display:block;
-        font-size:25px;
-        margin-bottom:4px;
-      }
-
-      #tracking .trackstat span {
-        color:#6b7280;
-        font-size:13px;
-      }
-
-      #tracking .trackcard {
-        background:#fff;
-        border-radius:16px;
-        padding:16px;
         margin-bottom:12px;
-        box-shadow:0 2px 8px #00000012;
       }
 
-      #tracking .trackcard h3 {
-        margin:0 0 6px;
+      .multiHead h3{
+        margin:0;
       }
 
-      #tracking .trackcard p {
-        margin:5px 0;
-        color:#6b7280;
-        font-size:14px;
+      .multiActions{
+        display:flex;
+        gap:8px;
       }
 
-      #tracking .trackinput {
-        width:100%;
-        box-sizing:border-box;
-        margin-top:8px;
-        padding:12px;
-        border:1px solid #d1d5db;
-        border-radius:10px;
-        font-size:16px;
-      }
-
-      #tracking .trackbtn {
-        width:100%;
-        margin-top:10px;
-        padding:12px;
+      .multiActions button{
         border:0;
+        background:#e8eefc;
+        color:#2878ed;
+        padding:8px 12px;
         border-radius:10px;
-        background:#111827;
-        color:white;
         font-weight:700;
       }
 
-      #tracking .trackbadge {
-        display:inline-block;
-        background:#eef2ff;
-        padding:5px 9px;
-        border-radius:999px;
-        font-size:12px;
-        margin-top:5px;
+      .multiList{
+        max-height:260px;
+        overflow:auto;
       }
 
-      #tracking .empty {
-        text-align:center;
-        padding:25px;
+      .multiItem{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:12px 4px;
+        border-bottom:1px solid #eee;
+      }
+
+      .multiItem:last-child{
+        border-bottom:0;
+      }
+
+      .multiItem input{
+        width:20px;
+        height:20px;
+      }
+
+      .multiItem div{
+        flex:1;
+      }
+
+      .multiItem strong{
+        display:block;
+      }
+
+      .multiItem small{
         color:#6b7280;
+      }
+
+      .batchInfo{
+        background:#eef7f0;
+        color:#166534;
+        padding:12px;
+        border-radius:12px;
+        margin-top:12px;
+        font-weight:700;
+      }
+
+      .batchNext{
+        margin-top:12px;
+        width:100%;
+        border:0;
+        border-radius:14px;
+        padding:15px;
+        background:#16a34a;
+        color:#fff;
+        font-size:17px;
+        font-weight:800;
+      }
+
+      .trackSummary{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:12px;
+        margin:15px 0;
+      }
+
+      .trackCard{
+        background:#fff;
+        border-radius:18px;
+        padding:18px;
+        box-shadow:0 3px 15px #00000010;
+      }
+
+      .trackCard b{
+        display:block;
+        font-size:30px;
+      }
+
+      .trackCard span{
+        color:#6b7280;
+        font-weight:700;
+      }
+
+      .trackSection{
+        background:#fff;
+        border-radius:18px;
+        padding:18px;
+        margin-top:15px;
+        box-shadow:0 3px 15px #00000010;
+      }
+
+      .trackSection h3{
+        margin-top:0;
+      }
+
+      .trackRow{
+        padding:13px 0;
+        border-bottom:1px solid #eee;
+      }
+
+      .trackRow:last-child{
+        border-bottom:0;
+      }
+
+      .trackRow strong{
+        display:block;
+        font-size:17px;
+      }
+
+      .trackRow small{
+        color:#6b7280;
+      }
+
+      .metaSave{
+        width:100%;
+        margin-top:8px;
+      }
+
+      .queueBadge{
+        display:inline-block;
+        background:#111827;
+        color:white;
+        border-radius:20px;
+        padding:5px 10px;
+        font-size:13px;
       }
     `;
 
     document.head.appendChild(style);
   }
 
-  function createTrackingPage() {
-    if (document.getElementById("tracking")) return;
-
-    const main = document.querySelector("main");
-
-    const section = document.createElement("section");
-    section.id = "tracking";
-    section.className = "page";
-
-    section.innerHTML = `
-      <div class="sectionhead">
-        <div>
-          <h2>Tracking</h2>
-          <p>Brand, product type & recipient tracking</p>
-        </div>
-      </div>
-
-      <div class="trackstats">
-        <div class="trackstat">
-          <b id="trackTotal">0</b>
-          <span>Total Shares</span>
-        </div>
-
-        <div class="trackstat">
-          <b id="trackBrands">0</b>
-          <span>Brands</span>
-        </div>
-
-        <div class="trackstat">
-          <b id="trackTypes">0</b>
-          <span>Product Types</span>
-        </div>
-
-        <div class="trackstat">
-          <b id="trackRecipients">0</b>
-          <span>Recipients</span>
-        </div>
-      </div>
-
-      <div class="trackcard">
-        <h3>Product Information</h3>
-        <p>Set the Brand Name and Product Type for each product.</p>
-      </div>
-
-      <div id="trackingProducts"></div>
-
-      <div class="trackcard">
-        <h3>Brand & Product Type Summary</h3>
-      </div>
-
-      <div id="trackingSummary"></div>
-
-      <div class="trackcard">
-        <h3>Recipient Summary</h3>
-      </div>
-
-      <div id="trackingRecipients"></div>
-    `;
-
-    main.appendChild(section);
-
-    const nav = document.querySelector(".tabbar");
-
-    const button = document.createElement("button");
-    button.dataset.page = "tracking";
-    button.innerHTML = `📊<span>Tracking</span>`;
-
-    button.onclick = () => {
-      if (typeof showPage === "function") {
-        showPage("tracking");
-      } else {
-        document.querySelectorAll(".page").forEach(x =>
-          x.classList.toggle("active", x.id === "tracking")
-        );
-      }
-
-      renderTracking();
-    };
-
-    nav.appendChild(button);
+  async function getProductsAndContacts() {
+    const products = await getMain("products");
+    const contacts = await getMain("contacts");
+    return { products, contacts };
   }
 
-  async function renderTracking() {
-    if (!trackDB) return;
+  async function getMetaMap() {
+    const rows = await allTracking("productMeta");
+    const map = {};
+    rows.forEach(x => map[x.productId] = x);
+    return map;
+  }
 
-    const products = await getAppData("products");
+  async function saveMeta(productId, brand, productType) {
+    await putTracking("productMeta", {
+      productId,
+      brand: brand.trim(),
+      productType: productType.trim()
+    });
+  }
+
+  async function renderTrackingPage() {
+    const page = $("tracking");
+    if (!page) return;
+
+    const { products } = await getProductsAndContacts();
+    const meta = await getMetaMap();
     const shares = await allTracking("shares");
-    const meta = await allTracking("productMeta");
-
-    const metaMap = {};
-    meta.forEach(x => metaMap[x.productId] = x);
 
     const brands = new Set(
       shares.map(x => x.brand).filter(Boolean)
@@ -281,249 +288,571 @@
       shares.map(x => x.contactName).filter(Boolean)
     );
 
-    document.getElementById("trackTotal").textContent = shares.length;
-    document.getElementById("trackBrands").textContent = brands.size;
-    document.getElementById("trackTypes").textContent = types.size;
-    document.getElementById("trackRecipients").textContent = recipients.size;
-
-    const productBox = document.getElementById("trackingProducts");
-
-    if (!products.length) {
-      productBox.innerHTML = `
-        <div class="empty">
-          No products found.<br>
-          Add products from the Products section first.
+    page.innerHTML = `
+      <div class="sectionhead">
+        <div>
+          <h2>Tracking</h2>
+          <p>Brand, product type & recipient tracking</p>
         </div>
-      `;
-    } else {
-      productBox.innerHTML = products.map(p => {
-        const m = metaMap[p.id] || {};
+      </div>
 
-        return `
-          <div class="trackcard">
-            <h3>${esc(p.name)}</h3>
-            <p>${esc(p.platform || "")}</p>
+      <div class="trackSummary">
+        <div class="trackCard">
+          <b>${shares.length}</b>
+          <span>Total Shares</span>
+        </div>
 
-            <input
-              class="trackinput"
-              id="brand_${esc(p.id)}"
-              placeholder="Brand Name e.g. Nike"
-              value="${esc(m.brand || "")}"
-            >
+        <div class="trackCard">
+          <b>${brands.size}</b>
+          <span>Brands</span>
+        </div>
 
-            <input
-              class="trackinput"
-              id="type_${esc(p.id)}"
-              placeholder="Product Type e.g. Shoes"
-              value="${esc(m.productType || "")}"
-            >
+        <div class="trackCard">
+          <b>${types.size}</b>
+          <span>Product Types</span>
+        </div>
 
-            <button
-              class="trackbtn"
-              data-save-product="${esc(p.id)}"
-            >
-              Save Product Info
-            </button>
-          </div>
-        `;
-      }).join("");
+        <div class="trackCard">
+          <b>${recipients.size}</b>
+          <span>Recipients</span>
+        </div>
+      </div>
 
-      document.querySelectorAll("[data-save-product]").forEach(btn => {
-        btn.onclick = async () => {
-          const id = btn.dataset.saveProduct;
+      <div class="trackSection">
+        <h3>Product Information</h3>
+        <p class="hint">
+          Set the Brand Name and Product Type for each product.
+        </p>
 
-          const brand =
-            document.getElementById("brand_" + id).value.trim();
+        ${
+          products.length
+          ? products.map(p => `
+            <div class="multiBox">
+              <h3>${esc(p.name)}</h3>
+              <p class="hint">${esc(p.platform || "")}</p>
 
-          const productType =
-            document.getElementById("type_" + id).value.trim();
+              <input
+                id="brand_${p.id}"
+                placeholder="Brand Name e.g. Nike"
+                value="${esc(meta[p.id]?.brand || "")}"
+              >
 
-          if (!brand || !productType) {
-            alert("Please enter Brand Name and Product Type.");
-            return;
-          }
+              <input
+                id="type_${p.id}"
+                placeholder="Product Type e.g. Shoes"
+                value="${esc(meta[p.id]?.productType || "")}"
+              >
 
-          await saveTracking("productMeta", {
-            productId: id,
-            brand,
-            productType
-          });
+              <button
+                class="primary big metaSave"
+                onclick="window.saveTrackingMeta('${p.id}')"
+              >
+                Save Product Info
+              </button>
+            </div>
+          `).join("")
+          : `<div class="empty">No products found.<br>Add products first.</div>`
+        }
+      </div>
 
-          alert("Product information saved.");
-          renderTracking();
-        };
-      });
-    }
+      <div class="trackSection">
+        <h3>Brand & Product Type Summary</h3>
 
-    const groups = {};
+        ${
+          shares.length
+          ? buildBrandSummary(shares)
+          : `<div class="empty">No shares tracked yet.</div>`
+        }
+      </div>
+
+      <div class="trackSection">
+        <h3>Recipient Summary</h3>
+
+        ${
+          shares.length
+          ? buildRecipientSummary(shares)
+          : `<div class="empty">No shares tracked yet.</div>`
+        }
+      </div>
+
+      <div class="trackSection">
+        <h3>Recent Shares</h3>
+
+        ${
+          shares.length
+          ? shares
+            .sort((a,b) => b.time - a.time)
+            .slice(0,50)
+            .map(x => `
+              <div class="trackRow">
+                <strong>
+                  ${esc(x.contactName)} → ${esc(x.productName)}
+                </strong>
+
+                <small>
+                  ${esc(x.brand || "No Brand")} ·
+                  ${esc(x.productType || "No Type")} ·
+                  ${new Date(x.time).toLocaleString()}
+                </small>
+              </div>
+            `).join("")
+          : `<div class="empty">No shares tracked yet.</div>`
+        }
+      </div>
+    `;
+  }
+
+  function buildBrandSummary(shares) {
+    const map = {};
 
     shares.forEach(x => {
       const key =
-        (x.brand || "Unknown Brand") +
+        (x.brand || "No Brand") +
         "||" +
-        (x.productType || "Unknown Type");
+        (x.productType || "No Type");
 
-      if (!groups[key]) {
-        groups[key] = {
-          brand: x.brand || "Unknown Brand",
-          type: x.productType || "Unknown Type",
+      if (!map[key]) {
+        map[key] = {
+          brand: x.brand || "No Brand",
+          type: x.productType || "No Type",
           count: 0,
-          recipients: new Set()
+          people: new Set()
         };
       }
 
-      groups[key].count++;
-      groups[key].recipients.add(x.contactName);
+      map[key].count++;
+      map[key].people.add(x.contactName);
     });
 
-    const summaryBox = document.getElementById("trackingSummary");
+    return Object.values(map)
+      .sort((a,b) => b.count - a.count)
+      .map(x => `
+        <div class="trackRow">
+          <strong>
+            ${esc(x.brand)} → ${esc(x.type)}
+            <span class="queueBadge">${x.count} shares</span>
+          </strong>
 
-    const groupList = Object.values(groups);
-
-    summaryBox.innerHTML = groupList.length
-      ? groupList
-          .sort((a, b) => b.count - a.count)
-          .map(x => `
-            <div class="trackcard">
-              <h3>${esc(x.brand)}</h3>
-              <span class="trackbadge">${esc(x.type)}</span>
-              <p><b>${x.count}</b> share(s)</p>
-              <p>Recipients: ${esc(
-                Array.from(x.recipients).join(", ")
-              )}</p>
-            </div>
-          `)
-          .join("")
-      : `<div class="empty">No shares tracked yet.</div>`;
-
-    const recipientGroups = {};
-
-    shares.forEach(x => {
-      if (!recipientGroups[x.contactName]) {
-        recipientGroups[x.contactName] = {
-          count: 0,
-          products: new Set()
-        };
-      }
-
-      recipientGroups[x.contactName].count++;
-
-      recipientGroups[x.contactName].products.add(
-        (x.brand || "Unknown") +
-        " - " +
-        (x.productType || "Unknown")
-      );
-    });
-
-    const recipientBox =
-      document.getElementById("trackingRecipients");
-
-    const recipientList =
-      Object.entries(recipientGroups)
-        .sort((a, b) => b[1].count - a[1].count);
-
-    recipientBox.innerHTML = recipientList.length
-      ? recipientList.map(([name, data]) => `
-          <div class="trackcard">
-            <h3>${esc(name)}</h3>
-            <p><b>${data.count}</b> share(s) received</p>
-            <p>${esc(
-              Array.from(data.products).join(", ")
-            )}</p>
-          </div>
-        `).join("")
-      : `<div class="empty">No recipient data yet.</div>`;
+          <small>
+            Recipients: ${esc([...x.people].join(", "))}
+          </small>
+        </div>
+      `).join("");
   }
 
-  async function setupWhatsAppTracking() {
-    const btn = document.getElementById("openWhatsApp");
+  function buildRecipientSummary(shares) {
+    const map = {};
 
-    if (!btn) return;
-
-    const originalHandler = btn.onclick;
-
-    if (!originalHandler) return;
-
-    btn.onclick = async function (event) {
-      const contacts = await getAppData("contacts");
-      const products = await getAppData("products");
-
-      const contact =
-        contacts.find(x =>
-          x.id === document.getElementById("sendContact").value
-        );
-
-      const product =
-        products.find(x =>
-          x.id === document.getElementById("sendProduct").value
-        );
-
-      if (!contact || !product) {
-        return originalHandler.call(this, event);
-      }
-
-      let metaList = await allTracking("productMeta");
-
-      let meta =
-        metaList.find(x => x.productId === product.id);
-
-      if (!meta || !meta.brand || !meta.productType) {
-        const brand = prompt(
-          "Enter Brand Name for:\n" + product.name
-        );
-
-        if (!brand) {
-          alert("Brand Name is required for tracking.");
-          return;
-        }
-
-        const productType = prompt(
-          "Enter Product Type for:\n" + product.name
-        );
-
-        if (!productType) {
-          alert("Product Type is required for tracking.");
-          return;
-        }
-
-        meta = {
-          productId: product.id,
-          brand: brand.trim(),
-          productType: productType.trim()
+    shares.forEach(x => {
+      if (!map[x.contactName]) {
+        map[x.contactName] = {
+          count:0,
+          products:new Set()
         };
-
-        await saveTracking("productMeta", meta);
       }
 
-      await saveTracking("shares", {
-        id: uid(),
-        productId: product.id,
-        productName: product.name,
-        brand: meta.brand,
-        productType: meta.productType,
-        contactName: contact.name,
-        phone: contact.phone,
-        time: Date.now()
-      });
+      map[x.contactName].count++;
+      map[x.contactName].products.add(x.productName);
+    });
 
-      return originalHandler.call(this, event);
+    return Object.entries(map)
+      .sort((a,b) => b[1].count - a[1].count)
+      .map(([name,x]) => `
+        <div class="trackRow">
+          <strong>
+            ${esc(name)}
+            <span class="queueBadge">${x.count} shares</span>
+          </strong>
+
+          <small>
+            Products: ${esc([...x.products].join(", "))}
+          </small>
+        </div>
+      `).join("");
+  }
+
+  window.saveTrackingMeta = async function (productId) {
+    const brand = $("brand_" + productId)?.value || "";
+    const type = $("type_" + productId)?.value || "";
+
+    if (!brand.trim() || !type.trim()) {
+      alert("Please enter both Brand Name and Product Type.");
+      return;
+    }
+
+    await saveMeta(productId, brand, type);
+    alert("Product information saved.");
+    renderTrackingPage();
+  };
+
+  async function recordShare(contact, product) {
+    const meta = await getMetaMap();
+    const m = meta[product.id] || {};
+
+    await putTracking("shares", {
+      id: uid(),
+      contactId: contact.id,
+      contactName: contact.name,
+      phone: contact.phone,
+      productId: product.id,
+      productName: product.name,
+      brand: m.brand || "",
+      productType: m.productType || "",
+      time: Date.now()
+    });
+  }
+
+  async function createSendUI() {
+    const send = $("send");
+    if (!send) return;
+
+    if ($("multiSendUI")) return;
+
+    const card = send.querySelector(".card");
+    if (!card) return;
+
+    const ui = document.createElement("div");
+    ui.id = "multiSendUI";
+
+    ui.innerHTML = `
+      <div class="multiBox">
+        <div class="multiHead">
+          <h3>Select Contacts</h3>
+
+          <div class="multiActions">
+            <button id="selectAllContacts">All</button>
+            <button id="clearContacts">Clear</button>
+          </div>
+        </div>
+
+        <div id="multiContacts" class="multiList"></div>
+      </div>
+
+      <div class="multiBox">
+        <div class="multiHead">
+          <h3>Select Products</h3>
+
+          <div class="multiActions">
+            <button id="selectAllProducts">All</button>
+            <button id="clearProducts">Clear</button>
+          </div>
+        </div>
+
+        <div id="multiProducts" class="multiList"></div>
+      </div>
+
+      <div id="batchInfo" class="batchInfo">
+        Select contacts and products to create a batch.
+      </div>
+
+      <button id="batchNext" class="batchNext">
+        Open WhatsApp
+      </button>
+    `;
+
+    card.insertBefore(ui, card.firstChild);
+
+    const oldContact = $("sendContact")?.parentElement;
+    const oldProduct = $("sendProduct")?.parentElement;
+
+    if (oldContact) oldContact.style.display = "none";
+    if (oldProduct) oldProduct.style.display = "none";
+
+    const oldButton = $("openWhatsApp");
+    if (oldButton) oldButton.style.display = "none";
+
+    await renderMultiLists();
+    setupMultiEvents();
+    updateBatchInfo();
+  }
+
+  async function renderMultiLists() {
+    const { contacts, products } = await getProductsAndContacts();
+
+    $("multiContacts").innerHTML = contacts.length
+      ? contacts.map(c => `
+        <label class="multiItem">
+          <input
+            type="checkbox"
+            class="contactCheck"
+            value="${esc(c.id)}"
+          >
+          <div>
+            <strong>${esc(c.name)}</strong>
+            <small>${esc(c.phone)}</small>
+          </div>
+        </label>
+      `).join("")
+      : `<div class="empty">No contacts available.</div>`;
+
+    $("multiProducts").innerHTML = products.length
+      ? products.map(p => `
+        <label class="multiItem">
+          <input
+            type="checkbox"
+            class="productCheck"
+            value="${esc(p.id)}"
+          >
+          <div>
+            <strong>${esc(p.name)}</strong>
+            <small>${esc(p.platform || "")}</small>
+          </div>
+        </label>
+      `).join("")
+      : `<div class="empty">No products available.</div>`;
+
+    document.querySelectorAll(".contactCheck,.productCheck")
+      .forEach(x => x.onchange = updateBatchInfo);
+  }
+
+  function setupMultiEvents() {
+    $("selectAllContacts").onclick = () => {
+      document.querySelectorAll(".contactCheck")
+        .forEach(x => x.checked = true);
+      updateBatchInfo();
+    };
+
+    $("clearContacts").onclick = () => {
+      document.querySelectorAll(".contactCheck")
+        .forEach(x => x.checked = false);
+      updateBatchInfo();
+    };
+
+    $("selectAllProducts").onclick = () => {
+      document.querySelectorAll(".productCheck")
+        .forEach(x => x.checked = true);
+      updateBatchInfo();
+    };
+
+    $("clearProducts").onclick = () => {
+      document.querySelectorAll(".productCheck")
+        .forEach(x => x.checked = false);
+      updateBatchInfo();
+    };
+
+    $("batchNext").onclick = processNextBatch;
+  }
+
+  async function getSelectedBatch() {
+    const { contacts, products } = await getProductsAndContacts();
+
+    const contactIds = [...document.querySelectorAll(".contactCheck:checked")]
+      .map(x => x.value);
+
+    const productIds = [...document.querySelectorAll(".productCheck:checked")]
+      .map(x => x.value);
+
+    const selectedContacts =
+      contacts.filter(x => contactIds.includes(x.id));
+
+    const selectedProducts =
+      products.filter(x => productIds.includes(x.id));
+
+    const queue = [];
+
+    selectedContacts.forEach(c => {
+      selectedProducts.forEach(p => {
+        queue.push({
+          contactId:c.id,
+          productId:p.id
+        });
+      });
+    });
+
+    return {
+      contacts:selectedContacts,
+      products:selectedProducts,
+      queue
     };
   }
 
-  async function initTracking() {
+  async function updateBatchInfo() {
+    const batch = await getSelectedBatch();
+
+    const total = batch.queue.length;
+
+    if (!total) {
+      $("batchInfo").textContent =
+        "Select contacts and products to create a batch.";
+
+      $("batchNext").textContent = "Open WhatsApp";
+      return;
+    }
+
+    $("batchInfo").textContent =
+      `${batch.contacts.length} contact(s) × ` +
+      `${batch.products.length} product(s) = ` +
+      `${total} WhatsApp message(s)`;
+  }
+
+  async function prepareQueue() {
+    const batch = await getSelectedBatch();
+
+    if (!batch.queue.length) {
+      alert("Please select at least one contact and one product.");
+      return false;
+    }
+
+    batchQueue = batch.queue;
+    batchIndex = 0;
+
+    localStorage.setItem(
+      "dealDhamakaBatchQueue",
+      JSON.stringify(batchQueue)
+    );
+
+    localStorage.setItem(
+      "dealDhamakaBatchIndex",
+      "0"
+    );
+
+    return true;
+  }
+
+  function loadSavedQueue() {
     try {
-      await openTrackingDB();
+      batchQueue =
+        JSON.parse(
+          localStorage.getItem("dealDhamakaBatchQueue") || "[]"
+        );
 
-      addStyles();
-      createTrackingPage();
-      await setupWhatsAppTracking();
-      await renderTracking();
-
-      console.log("Deal Dhamaka Tracking ready.");
-    } catch (error) {
-      console.error("Tracking error:", error);
+      batchIndex =
+        Number(
+          localStorage.getItem("dealDhamakaBatchIndex") || 0
+        );
+    } catch {
+      batchQueue = [];
+      batchIndex = 0;
     }
   }
 
-  initTracking();
+  async function processNextBatch() {
+    if (!batchQueue.length || batchIndex >= batchQueue.length) {
+      const ok = await prepareQueue();
+      if (!ok) return;
+    }
+
+    const item = batchQueue[batchIndex];
+
+    const { contacts, products } = await getProductsAndContacts();
+
+    const contact = contacts.find(x => x.id === item.contactId);
+    const product = products.find(x => x.id === item.productId);
+
+    if (!contact || !product) {
+      batchIndex++;
+      localStorage.setItem(
+        "dealDhamakaBatchIndex",
+        String(batchIndex)
+      );
+      processNextBatch();
+      return;
+    }
+
+    const message =
+      `🔥 *Deal Alert!*\n\n` +
+      `Hi ${contact.name} 👋\n\n` +
+      `Check out this amazing deal:\n` +
+      `🛍️ *${product.name}*\n` +
+      `${product.price ? `💰 ₹${product.price}\n` : ""}` +
+      `${product.description ? `\n${product.description}\n` : ""}` +
+      `\n🔗 Buy Now: ${product.link}\n\n` +
+      `Happy Shopping! ❤️`;
+
+    await recordShare(contact, product);
+
+    batchIndex++;
+
+    localStorage.setItem(
+      "dealDhamakaBatchIndex",
+      String(batchIndex)
+    );
+
+    const phone = contact.phone.replace(/\D/g, "");
+
+    if (phone.length < 10) {
+      alert("Invalid WhatsApp number for " + contact.name);
+      return;
+    }
+
+    const remaining = batchQueue.length - batchIndex;
+
+    $("batchInfo").textContent =
+      remaining > 0
+      ? `${remaining} message(s) remaining in this batch.`
+      : "Batch completed.";
+
+    $("batchNext").textContent =
+      remaining > 0
+      ? `Open Next WhatsApp (${remaining} left)`
+      : "Start New Batch";
+
+    window.location.href =
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  }
+
+  function enhanceNavigation() {
+    const trackingTab =
+      [...document.querySelectorAll(".tabbar button")]
+        .find(x => x.dataset.page === "tracking");
+
+    if (!trackingTab) return;
+
+    trackingTab.onclick = async () => {
+      if (typeof showPage === "function") {
+        showPage("tracking");
+      }
+
+      await renderTrackingPage();
+    };
+  }
+
+  async function init() {
+    try {
+      injectStyles();
+      await openTrackingDB();
+
+      loadSavedQueue();
+
+      await createSendUI();
+      enhanceNavigation();
+
+      if ($("tracking")) {
+        await renderTrackingPage();
+      }
+
+      const originalShowPage = window.showPage;
+
+      if (originalShowPage && !originalShowPage.__trackingEnhanced) {
+        const wrapped = function(name) {
+          originalShowPage(name);
+
+          if (name === "send") {
+            setTimeout(async () => {
+              await createSendUI();
+              loadSavedQueue();
+              updateBatchInfo();
+            }, 50);
+          }
+
+          if (name === "tracking") {
+            setTimeout(renderTrackingPage, 50);
+          }
+        };
+
+        wrapped.__trackingEnhanced = true;
+        window.showPage = wrapped;
+      }
+
+    } catch (e) {
+      console.error("Tracking initialization error:", e);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
 })();
