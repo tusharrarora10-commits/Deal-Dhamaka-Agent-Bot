@@ -727,69 +727,72 @@
   }
 
   async function processNextBatch() {
-    if (!batchQueue.length || batchIndex >= batchQueue.length) {
-      const ok = await prepareQueue();
-      if (!ok) return;
-    }
+  if (!batchQueue.length || batchIndex >= batchQueue.length) {
+    const ok = await prepareQueue();
+    if (!ok) return;
+  }
 
-    const item = batchQueue[batchIndex];
+  const item = batchQueue[batchIndex];
 
-    const { contacts, products } = await getProductsAndContacts();
+  const { contacts, products } = await getProductsAndContacts();
 
-    const contact = contacts.find(x => x.id === item.contactId);
-    const product = products.find(x => x.id === item.productId);
+  const contact = contacts.find(x => x.id === item.contactId);
+  const product = products.find(x => x.id === item.productId);
 
-    if (!contact || !product) {
-      batchIndex++;
-      localStorage.setItem(
-        "dealDhamakaBatchIndex",
-        String(batchIndex)
-      );
-      processNextBatch();
-      return;
-    }
-
-    const message =
-      `🔥 *Deal Alert!*\n\n` +
-      `Hi ${contact.name} 👋\n\n` +
-      `Check out this amazing deal:\n` +
-      `🛍️ *${product.name}*\n` +
-      `${product.price ? `💰 ₹${product.price}\n` : ""}` +
-      `${product.description ? `\n${product.description}\n` : ""}` +
-      `\n🔗 Buy Now: ${product.link}\n\n` +
-      `Happy Shopping! ❤️`;
-
-    await recordShare(contact, product);
-
+  if (!contact || !product) {
     batchIndex++;
-
     localStorage.setItem(
       "dealDhamakaBatchIndex",
       String(batchIndex)
     );
+    return processNextBatch();
+  }
 
-    const phone = contact.phone.replace(/\D/g, "");
+  const message =
+    `🔥 *Deal Alert!*\n\n` +
+    `Hi ${contact.name} 👋\n\n` +
+    `Check out this amazing deal:\n` +
+    `🛍️ *${product.name}*\n` +
+    `${product.price ? `💰 ₹${product.price}\n` : ""}` +
+    `${product.description ? `\n${product.description}\n` : ""}` +
+    `\n🔗 Buy Now: ${product.link}\n\n` +
+    `Happy Shopping! ❤️`;
 
-    if (phone.length < 10) {
-      alert("Invalid WhatsApp number for " + contact.name);
-      return;
-    }
+  const phone = contact.phone.replace(/\D/g, "");
 
-    const remaining = batchQueue.length - batchIndex;
+  if (phone.length < 10) {
+    alert("Invalid WhatsApp number for " + contact.name);
+    return;
+  }
 
-    $("batchInfo").textContent =
-      remaining > 0
-      ? `${remaining} message(s) remaining in this batch.`
-      : "Batch completed.";
+  /*
+   * Record this share only when this WhatsApp step is opened.
+   * The user still has to tap Send inside WhatsApp.
+   */
+  await recordShare(contact, product);
 
-    $("batchNext").textContent =
-      remaining > 0
+  const remaining = batchQueue.length - batchIndex - 1;
+
+  $("batchInfo").textContent =
+    remaining > 0
+      ? `✅ ${batchIndex + 1} of ${batchQueue.length} opened. ${remaining} remaining.`
+      : `🎉 Batch completed. ${batchQueue.length} message(s) opened.`;
+
+  $("batchNext").textContent =
+    remaining > 0
       ? `Open Next WhatsApp (${remaining} left)`
       : "Start New Batch";
 
-    window.location.href =
-      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  }
+  batchIndex++;
+
+  localStorage.setItem(
+    "dealDhamakaBatchIndex",
+    String(batchIndex)
+  );
+
+  window.location.href =
+    `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
 
   function enhanceNavigation() {
     const trackingTab =
