@@ -69,6 +69,55 @@
     <p class="hint">This first version stores data securely in the browser on this device. Export backups regularly.</p>
   </div>
 </section>
+<section id="tracking" class="page">
+  <div class="sectionhead">
+    <div>
+      <h2>Tracking</h2>
+      <p>Brand, product type, recipient & date tracking</p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="trackingTotal">0</b><span>Total Shares</span></div>
+    <div class="stat"><b id="trackingBrands">0</b><span>Brands</span></div>
+    <div class="stat"><b id="trackingTypes">0</b><span>Product Types</span></div>
+    <div class="stat"><b id="trackingRecipients">0</b><span>Recipients</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Filters</h3>
+    <label>Brand<select id="trackingBrandFilter"><option value="">All Brands</option></select></label>
+    <label>Product Type<select id="trackingTypeFilter"><option value="">All Product Types</option></select></label>
+    <label>Recipient<select id="trackingRecipientFilter"><option value="">All Recipients</option></select></label>
+    <label>Date<input type="date" id="trackingDateFilter"></label>
+    <button class="secondary full" id="clearTrackingFilters">Clear Filters</button>
+  </div>
+
+  <div class="card">
+    <h3>Brand-wise Count</h3>
+    <div id="trackingBrandSummary"></div>
+  </div>
+
+  <div class="card">
+    <h3>Product Type-wise Count</h3>
+    <div id="trackingTypeSummary"></div>
+  </div>
+
+  <div class="card">
+    <h3>Brand + Product Type</h3>
+    <div id="trackingBrandTypeSummary"></div>
+  </div>
+
+  <div class="card">
+    <h3>Recipient-wise Count</h3>
+    <div id="trackingRecipientSummary"></div>
+  </div>
+
+  <div class="card">
+    <h3>Recipient Details</h3>
+    <div id="trackingDetails"></div>
+  </div>
+</section>
 </main>
 
 <nav class="tabbar">
@@ -78,6 +127,7 @@
 <button data-page="send">↗<span>Send</span></button>
 <button data-page="history">◷<span>History</span></button>
 <button data-page="settings">⚙<span>Settings</span></button>
+<button data-page="tracking">📊<span>Tracking</span></button>
 </nav>
 
 <div id="modal" class="modal" hidden>
