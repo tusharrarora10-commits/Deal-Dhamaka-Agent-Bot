@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Deal Dhamaka Agent</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div><div class="eyebrow">DEAL DHAMAKA</div><h1>WhatsApp Agent</h1></div>
+  <button id="installBtn" class="iconbtn" hidden>＋</button>
+</header>
+
+<main>
+<section id="dashboard" class="page active">
+  <div class="hero"><h2>Send deals, simply.</h2><p>Manage contacts and products, then open WhatsApp with a personalized message.</p></div>
+  <div class="stats">
+    <div class="stat"><b id="contactCount">0</b><span>Contacts</span></div>
+    <div class="stat"><b id="productCount">0</b><span>Products</span></div>
+    <div class="stat"><b id="sentCount">0</b><span>Sent</span></div>
+  </div>
+  <button class="primary big" data-page="send">Send a Deal →</button>
+  <div class="card"><h3>How it works</h3><ol><li>Select a saved contact.</li><li>Select a product/deal.</li><li>Review the personalized message.</li><li>Tap “Open WhatsApp”.</li></ol></div>
+</section>
+
+<section id="contacts" class="page">
+  <div class="sectionhead"><div><h2>Contacts</h2><p>Names and WhatsApp numbers</p></div><button class="primary" id="addContact">＋ Add</button></div>
+  <input id="contactSearch" class="search" placeholder="Search name or number">
+  <div id="contactsList"></div>
+</section>
+
+<section id="products" class="page">
+  <div class="sectionhead"><div><h2>Products</h2><p>Deals and links</p></div><button class="primary" id="addProduct">＋ Add</button></div>
+  <input id="productSearch" class="search" placeholder="Search product">
+  <div id="productsList"></div>
+</section>
+
+<section id="send" class="page">
+  <div class="sectionhead"><div><h2>Send WhatsApp</h2><p>Create a personalized deal message</p></div></div>
+  <div class="card">
+    <label>Contact<select id="sendContact"></select></label>
+    <label>Product<select id="sendProduct"></select></label>
+    <label>Message<textarea id="message" rows="10"></textarea></label>
+    <button id="openWhatsApp" class="whatsapp big">Open WhatsApp →</button>
+    <p class="hint">WhatsApp opens the selected chat with the message pre-filled. You still tap Send inside WhatsApp.</p>
+  </div>
+</section>
+
+<section id="history" class="page">
+  <div class="sectionhead"><div><h2>History</h2><p>Your local sending log</p></div><button class="danger" id="clearHistory">Clear</button></div>
+  <div id="historyList"></div>
+</section>
+
+<section id="settings" class="page">
+  <div class="sectionhead"><div><h2>Data & Settings</h2><p>Backup your local database</p></div></div>
+  <div class="card">
+    <button class="secondary full" id="exportData">Export Backup (JSON)</button>
+    <label class="filelabel">Import Backup (JSON)<input type="file" id="importData" accept=".json"></label>
+    <button class="secondary full" id="importCsvContacts">Import Contacts CSV</button>
+    <input type="file" id="contactsCsv" accept=".csv" hidden>
+    <button class="secondary full" id="importCsvProducts">Import Products CSV</button>
+    <input type="file" id="productsCsv" accept=".csv" hidden>
+    <button class="danger full" id="resetData">Delete All Local Data</button>
+    <p class="hint">This first version stores data securely in the browser on this device. Export backups regularly.</p>
+  </div>
+</section>
+</main>
+
+<nav class="tabbar">
+<button data-page="dashboard">⌂<span>Home</span></button>
+<button data-page="contacts">♙<span>Contacts</span></button>
+<button data-page="products">▣<span>Products</span></button>
+<button data-page="send">↗<span>Send</span></button>
+<button data-page="history">◷<span>History</span></button>
+<button data-page="settings">⚙<span>Settings</span></button>
+</nav>
+
+<div id="modal" class="modal" hidden>
+  <div class="modalbox">
+    <div class="modalhead"><h3 id="modalTitle"></h3><button id="closeModal">×</button></div>
+    <form id="modalForm"></form>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
