@@ -274,7 +274,26 @@
 
     const { products } = await getProductsAndContacts();
     const meta = await getMetaMap();
-    const shares = await allTracking("shares");
+    
+const dbShares = await allTracking("shares");
+let localShares = [];
+
+try {
+  localShares = JSON.parse(
+    localStorage.getItem("dealDhamakaTrackedShares") || "[]"
+  );
+} catch (e) {
+  localShares = [];
+}
+
+const shareMap = new Map();
+
+[...dbShares, ...localShares].forEach(x => {
+  shareMap.set(x.id, x);
+});
+
+const shares = [...shareMap.values()];
+
 
     const brands = new Set(
       shares.map(x => x.brand).filter(Boolean)
