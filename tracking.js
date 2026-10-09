@@ -366,6 +366,9 @@
       </div>
 
       <div class="trackSection">
+      <h3>Date-wise Summary</h3>
+      ${shares.length ? buildDateSummary(shares) : `<div class="empty">No shares tracked yet.</div>`}
+</div>
         <h3>Recipient Summary</h3>
 
         ${
