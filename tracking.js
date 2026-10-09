@@ -504,6 +504,7 @@
       time: Date.now()
     });
   }
+  window.recordShare = recordShare;
 
   async function createSendUI() {
     const send = $("send");
