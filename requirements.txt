@@ -1,4 +1,0 @@
-openpyxl>=3.1
-pyinstaller>=6.0
-selenium>=4.20
-webdriver-manager>=4.0
